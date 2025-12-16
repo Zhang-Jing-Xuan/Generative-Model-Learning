@@ -96,6 +96,7 @@ We first introduce the basic theory of Denoising Diffusion Probabilistic Models 
 \subsection{Forward Diffusion Process}
 The forward diffusion process is defined as a Markov chain that progressively adds Gaussian noise to the data over $T$ time steps. Given a data point $\mathbf{x}_0$ sampled from the data distribution $q(\mathbf{x}_0)$, the forward process produces a sequence of noisy samples $\mathbf{x}_1, \mathbf{x}_2, \ldots, \mathbf{x}_T$ according to the following transition probabilities:
 \begin{equation}
+  \label{forward}
 q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t} \mathbf{x}_{t-1}, \beta_t \mathbf{I}),
 \end{equation}
 where $\beta_t$ is a variance schedule that controls the amount of noise added at each time step. The cumulative effect of this process can be expressed as:
@@ -103,6 +104,34 @@ where $\beta_t$ is a variance schedule that controls the amount of noise added a
 q(\mathbf{x}_t | \mathbf{x}_0) = \mathcal{N}(\mathbf{x}_t; \sqrt{\bar{\alpha}_t} \mathbf{x}_0, (1 - \bar{\alpha}_t) \mathbf{I}),
 \end{equation}
 where $\bar{\alpha}_t = \prod_{s=1}^t (1 - \beta_s)$.
+
+\subsection{Reverse Diffusion Process}
+
+The reverse process can be shown as:
+\begin{equation}
+q(\mathbf{x}_{t-1} | \mathbf{x}_t)=\frac{q(\mathbf{x}_t,\mathbf{x}_{t-1})}{q(\mathbf{x}_t)}=\frac{q(\mathbf{x}_{t} | \mathbf{x}_{t-1}) q(\mathbf{x}_{t-1})}{q(\mathbf{x}_t)}
+\end{equation}
+
+According to Eq. (\ref{forward}) and the definition of the Gaussian distribution, we have:
+\begin{equation}
+   \begin{aligned}
+q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) & =q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}, \mathbf{x}_0\right) \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_t \mid \mathbf{x}_0\right)} \\
+& \propto \exp \left(-\frac{1}{2}\left(\frac{\left(\mathbf{x}_t-\sqrt{\alpha_t} \mathbf{x}_{t-1}\right)^2}{\beta_t}+\frac{\left(\mathbf{x}_{t-1}-\sqrt{\bar{\alpha}_{t-1}} \mathbf{x}_0\right)^2}{1-\bar{\alpha}_{t-1}}-\frac{\left(\mathbf{x}_t-\sqrt{\bar{\alpha}_t} \mathbf{x}_0\right)^2}{1-\bar{\alpha}_t}\right)\right) \\
+& =\exp \left(-\frac{1}{2}\left(\left(\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) \mathbf{x}_{t-1}^2-\left(\frac{2 \sqrt{\alpha_t}}{\beta_t} \mathbf{x}_t+\frac{2 \sqrt{\bar{\alpha}_t}}{1-\bar{\alpha}_t} \mathbf{x}_0\right) \mathbf{x}_{t-1}+C\left(\mathbf{x}_t, \mathbf{x}_0\right)\right)\right.
+\end{aligned}
+\end{equation}
+
+The reverse diffusion process aims to learn a parameterized model $p_\theta(\mathbf{x}_{t-1} | \mathbf{x}_t)$ that can reverse the forward diffusion process. The reverse process is also defined as a Markov chain, but it starts from pure noise $\mathbf{x}_T \sim \mathcal{N}(0, \mathbf{I})$ and iteratively denoises the samples to recover the original data:
+\begin{equation}
+p_\theta(\mathbf{x}_{t-1} | \mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1}; \mu_\theta(\mathbf{x}_t, t), \Sigma_\theta(\mathbf{x}_t, t)),
+\end{equation}
+where $\mu_\theta$ and $\Sigma_\theta$ are neural networks that predict the mean and covariance of the reverse transition.
+\subsection{Training Objective}
+The training objective of DDPM is to minimize the variational bound on the negative log-likelihood of the data. This can be simplified to a mean squared error loss between the predicted noise and the true noise added during the forward process:
+\begin{equation}
+L(\theta) = \mathbb{E}_{\mathbf{x}_0, \epsilon, t} \left[ \| \epsilon - \epsilon_\theta(\mathbf{x}_t, t) \|^2 \right],
+\end{equation}
+where $\epsilon \sim \mathcal{N}(0, \mathbf{I})$ is the noise added to the data, and $\epsilon_\theta$ is the neural network that predicts the noise given the noisy sample $\mathbf{x}_t$ and time step $t$.
 
 % \section*{References}
 \bibliographystyle{IEEEtran}
