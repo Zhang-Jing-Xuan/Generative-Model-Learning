@@ -89,7 +89,7 @@
 %   must be limited to one paragraph.
 % \end{abstract}
 
-\section{Theory}
+\section{Theory for Basic Flow Matching}
 
 According to the Flow Matching paper \cite{FM_Basic}, we need to find a path between the noise distribution $p_0(x_0)$, such as Gaussian, to the data distribution $p_1(x_1)$. To go through the whole path, one possible way is to interpolate the two distributions linearly:
 \begin{equation}
@@ -106,13 +106,35 @@ In the original paper, we use $\psi_t$ to model $x$ and $u_t$ to model the deriv
 \end{equation}
 However, we do not know how to sample from $p_t(x_t)$ nor the ground truth $u_t(x_t)$. To solve this problem, we can represent the loss function as:
 \begin{equation}
+  \label{L_FMBase}
   \begin{aligned}
     L &= \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)-u_t\left(x_t\right)\right\|^2\right] \\
     &=\mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)\right\|^2-2 \cdot v_t\left(x_t\right) \cdot u_t\left(x_t\right)+\left\|u_t\left(x_t\right)\right\|^2\right]
   \end{aligned}
 \end{equation}
 
-The middle term can be transformed using the expection notation:
+We first derive the expression of $u_t$. On the one hand, according to the continuity function:
+\begin{equation}
+  \label{continuity}
+\frac{d}{d t} p_t(x)+\operatorname{div}\left(p_t(x) u_t(x)\right)=0
+\end{equation}
+
+On the other hand, we have:
+\begin{equation}
+  \label{conditioned}
+  \begin{aligned}
+  \frac{d}{d t} p_t(x)&=\int\left(\frac{d}{d t} p_t\left(x|x_1\right)\right) q\left(x_1\right) d x_1\\
+  &=-\int\operatorname{div}\left(u_t\left(x|x_1) p_t(x|x_1)\right)q(x_1) d x_1\right.\\
+  &=-\operatorname{div}\left(\int\left(u_t\left(x|x_1) p_t(x|x_1)\right)q(x_1) d x_1\right.\right)\\
+  \end{aligned}
+\end{equation}
+
+By comparing Eqs. (\ref{continuity}) and (\ref{conditioned}), we have:
+\begin{equation}
+  u_t=\frac{\int u_t\left(x|x_1\right) p_t\left(x|x_1\right) q\left(x_1\right) d x_1}{p_t(x)}.
+\end{equation}
+
+The middle term of Eq. (\ref{L_FMBase}) can be transformed using the expection notation:
 
 \begin{equation}
   \begin{aligned}
