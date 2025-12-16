@@ -1,0 +1,172 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+\PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2025
+
+
+% ready for submission
+\usepackage{neurips_2025}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2025}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2025}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2025}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{amssymb,amsfonts,amsmath,mathrsfs}
+
+\title{Notes for Flow Matching}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+  Jingxuan Zhang\\
+  Department of Computer Science and Engineering\\
+  East China University of Science and Technology\\
+  Shanghai, China \\
+  \texttt{y21220033@mail.ecust.edu.cn} \\
+  % examples of more authors
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+% \begin{abstract}
+%   The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on
+%   both the left- and right-hand margins. Use 10~point type, with a vertical
+%   spacing (leading) of 11~points.  The word \textbf{Abstract} must be centered,
+%   bold, and in point size 12. Two line spaces precede the abstract. The abstract
+%   must be limited to one paragraph.
+% \end{abstract}
+
+\section{Theory}
+
+According to the Flow Matching paper \cite{FM_Basic}, we need to find a path between the noise distribution $p_0(x_0)$, such as Gaussian, to the data distribution $p_1(x_1)$. To go through the whole path, one possible way is to interpolate the two distributions linearly:
+\begin{equation}
+    x_t = (1-t)x_0 + tx_1, \quad t \in [0, 1].
+\end{equation}
+Here $x_0 \sim p_0(x_0)$ and $x_1 \sim p_1(x_1)$. Then we can derive the velocity field $v_t(x_t)$ as:
+\begin{equation}
+    v_t(x_t) = \frac{dx_t}{dt} = x_1 - x_0.
+\end{equation}
+
+In the original paper, we use $\psi_t$ to model $x$ and $u_t$ to model the derivative, such as $x_t=\psi_t(x)$ and $\frac{d}{dt}x_t = \frac{d}{dt}\psi_t(x)= u_t(\psi_t(x))$. We construct a neural network $v_t(x_t)$ to approximate the velocity field $u_t(x_t)$. The loss function is defined as:
+\begin{equation}
+    L = \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)-u_t\left(x_t\right)\right\|^2\right].
+\end{equation}
+However, we do not know how to sample from $p_t(x_t)$ nor the ground truth $u_t(x_t)$. To solve this problem, we can represent the loss function as:
+\begin{equation}
+  \begin{aligned}
+    L &= \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)-u_t\left(x_t\right)\right\|^2\right] \\
+    &=\mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)\right\|^2-2 \cdot v_t\left(x_t\right) \cdot u_t\left(x_t\right)+\left\|u_t\left(x_t\right)\right\|^2\right]
+  \end{aligned}
+\end{equation}
+
+The middle term can be transformed using the expection notation:
+
+\begin{equation}
+  \begin{aligned}
+  &\mathbb{E}_{x_t \sim p_t(x)}\left[2 \cdot v_t\left(x_t\right) \cdot u_t\left(x_t\right)\right]=2 \cdot \int v_t\left(x_t\right) \cdot u_t\left(x_t\right) \cdot p_t\left(x_t\right) \mathrm{d} x_t\\
+  =&2 \cdot \int v_t\left(x_t\right) \cdot \frac{\int u_t\left(x_t \mid x_1\right) p_t\left(x_t \mid x_1\right) q\left(x_1\right) \mathrm{d} x_1}{p_t\left(x_t\right)} \cdot p_t\left(x_t\right) \mathrm{d} x_t\\
+  =&2 \cdot \iint v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right) \cdot p_t\left(x_t \mid x_1\right) q\left(x_1\right) \mathrm{d} x_1 \mathrm{d} x_t\\
+=&2 \cdot \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right)\right]
+  \end{aligned}.
+\end{equation}
+
+After we plug in the above equation, we have:
+\begin{equation}
+  \begin{aligned}
+    L &= \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)\right\|^2\right] - 2 \cdot \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right)\right] \\
+    &\quad + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t\right)\right\|^2\right]\\
+    &= \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)\right\|^2\right] - 2 \cdot \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right)\right] \\
+    &\quad + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t\right)\right\|^2\right]+\left.\left\|u_t\left(x_t \mid x_1\right)\right\|^2-\left\|u_t\left(x_t \mid x_1\right)\right\|^2\right]\\
+  \end{aligned}
+\end{equation}
+
+After we swap the last two terms, we have:
+\begin{equation}
+  \begin{aligned}
+    L &= \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|v_t\left(x_t\right)\right\|^2\right] - 2 \cdot \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right)\right] \\
+    &\quad + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t \mid x_1\right)\right\|^2\right] + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t\right)\right\|^2 - \left\|u_t\left(x_t \mid x_1\right)\right\|^2\right]\\
+    &= \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[\left\|v_t\left(x_t\right)\right\|^2 - 2 \cdot v_t\left(x_t\right) \cdot u_t\left(x_t \mid x_1\right) + \left\|u_t\left(x_t \mid x_1\right)\right\|^2\right] \\
+    &\quad + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t\right)\right\|^2 - \left\|u_t\left(x_t \mid x_1\right)\right\|^2\right]\\
+    &= \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[\left\|v_t\left(x_t\right) - u_t\left(x_t \mid x_1\right)\right\|^2\right] \\
+    &\quad + \mathbb{E}_{x_t \sim p_t\left(x_t\right)}\left[\left\|u_t\left(x_t\right)\right\|^2 - \left\|u_t\left(x_t \mid x_1\right)\right\|^2\right]\\
+  \end{aligned}
+\end{equation}
+
+The last term is a constant that does not depend on $v_t$. Therefore, we can minimize the following loss function instead:
+\begin{equation}
+    L = \mathbb{E}_{x_1 \sim q\left(x_1\right), x_t \sim p_t\left(x_t \mid x_1\right)}\left[\left\|v_t\left(x_t\right) - u_t\left(x_t \mid x_1\right)\right\|^2\right].
+\end{equation}
+
+Suppose $\psi_t(x)=\sigma_t\left(x_1\right) x+\mu_t\left(x_1\right)$, we have $\psi_t\left(x_0\right)=\sigma_t\left(x_1\right) x_0+\mu_t\left(x_1\right)$. Let $\mu_t\left(x_1\right)=t x_1,\quad \sigma_t\left(x_1\right)=1-t$, then $x_t=\psi_t\left(x_0\right)=(1-t) x_0+t x_1,$ which is the same as our linear interpolation. 
+
+Now, remember that $\frac{d}{dt}x_t = \frac{d}{dt}\psi_t(x)= u_t(\psi_t(x))$. We can add a condition to the both sides, and then we have $\frac{\mathrm{d}}{\mathrm{~d} t} \psi_t(x)=u_t\left(\psi_t(x) \mid x_1\right)$ or $\frac{\mathrm{d}}{\mathrm{~d} t} x_t=u_t\left(x_t \mid x_1\right)$ or $\frac{\mathrm{d}}{\mathrm{~d} t} \psi_t\left(x_0\right)=u_t\left(\psi_t\left(x_0\right) \mid x_1\right)$.
+
+Therefore, the loss function can be rewritten as:
+\begin{equation}
+    L = \mathbb{E}_{x_1 \sim q\left(x_1\right), x_0 \sim p_0\left(x_0\right)}\left[\left\|v_t\left(\psi_t\left(x_0\right)\right) - \frac{\mathrm{d}}{\mathrm{~d} t} \psi_t\left(x_0\right)\right\|^2\right].
+\end{equation}
+After calculating the derivative, we have:
+\begin{equation}
+    L = \mathbb{E}_{x_1 \sim q\left(x_1\right), x_0 \sim p_0\left(x_0\right)}\left[\left\|v_t\left((1-t) x_0+t x _1\right) - (x_1 - x_0)\right\|^2\right].
+\end{equation}
+This is the final loss function used in the Flow Matching paper.
+
+% \section*{References}
+\bibliographystyle{IEEEtran}
+\bibliography{IEEE_Trans}
+
+
+\end{document}
